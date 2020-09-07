@@ -36,35 +36,35 @@ import (
 )
 
 // Check all RBAC is ready for cert-manager
-func checkRbac(instance *operatorv1alpha1.CertManager, scheme *runtime.Scheme, client client.Client, ns string) error {
-	if rolesError := roles(instance, scheme, client, ns); rolesError != nil {
+func checkRbac(instance *operatorv1alpha1.CertManager, scheme *runtime.Scheme, client client.Client, watchNS string) error {
+	if rolesError := roles(instance, scheme, client, watchNS); rolesError != nil {
 		return rolesError
 	}
 	return nil
 }
 
-func roles(instance *operatorv1alpha1.CertManager, scheme *runtime.Scheme, client client.Client, ns string) error {
+func roles(instance *operatorv1alpha1.CertManager, scheme *runtime.Scheme, client client.Client, watchNS string) error {
 
-	if serviceAccountErr := createServiceAccount(instance, scheme, client, ns); serviceAccountErr != nil {
+	if serviceAccountErr := createServiceAccount(instance, scheme, client); serviceAccountErr != nil {
 		return serviceAccountErr
 	}
-	if roleErr := createRole(instance, scheme, client, ns); roleErr != nil {
+	if roleErr := createRole(instance, scheme, client); roleErr != nil {
 		return roleErr
 	}
-	if len(ns) == 0 {
-		if err := escalateRoleToClusterPermission(client, ns); err != nil {
+	if len(watchNS) == 0 {
+		if err := escalateRoleToClusterPermission(instance, client); err != nil {
 			return err
 		}
 
 	}
-	if clusterRoleErr := createClusterRole(instance, scheme, client, ns); clusterRoleErr != nil {
+	if clusterRoleErr := createClusterRole(instance, scheme, client); clusterRoleErr != nil {
 		return clusterRoleErr
 	}
 
 	return nil
 }
 
-func escalateRoleToClusterPermission(client client.Client, ns string) error {
+func escalateRoleToClusterPermission(instance *operatorv1alpha1.CertManager, client client.Client) error {
 	log.Info("Escalating role to cluster permission")
 	clusterRole := &rbacv1.ClusterRole{}
 	err := client.Get(context.Background(), types.NamespacedName{Name: res.RoleName, Namespace: ""}, clusterRole)
@@ -93,7 +93,7 @@ func escalateRoleToClusterPermission(client client.Client, ns string) error {
 				Kind:      "ServiceAccount",
 				APIGroup:  "",
 				Name:      res.ServiceAccount,
-				Namespace: ns,
+				Namespace: instance.ObjectMeta.Namespace,
 			},
 		},
 		RoleRef: rbacv1.RoleRef{
@@ -109,15 +109,15 @@ func escalateRoleToClusterPermission(client client.Client, ns string) error {
 	return nil
 }
 
-func createRole(instance *operatorv1alpha1.CertManager, scheme *runtime.Scheme, client client.Client, ns string) error {
+func createRole(instance *operatorv1alpha1.CertManager, scheme *runtime.Scheme, client client.Client) error {
 	log.Info("Creating role")
 	role := &rbacv1.Role{}
-	err := client.Get(context.Background(), types.NamespacedName{Name: res.RoleName, Namespace: ns}, role)
+	err := client.Get(context.Background(), types.NamespacedName{Name: res.RoleName, Namespace: instance.ObjectMeta.Namespace}, role)
 	if err != nil && apiErrors.IsNotFound(err) {
 		res.DefaultRole.ResourceVersion = ""
 
 		r := res.DefaultRole.DeepCopy()
-		r.ObjectMeta.Namespace = ns
+		r.ObjectMeta.Namespace = instance.ObjectMeta.Namespace
 		if err := controllerutil.SetControllerReference(instance, r, scheme); err != nil {
 			log.Error(err, "Error setting controller reference on role")
 		}
@@ -132,7 +132,7 @@ func createRole(instance *operatorv1alpha1.CertManager, scheme *runtime.Scheme, 
 	b := &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      res.RoleName,
-			Namespace: ns,
+			Namespace: instance.ObjectMeta.Namespace,
 		},
 		Subjects: []rbacv1.Subject{
 			{
@@ -160,7 +160,7 @@ func createRole(instance *operatorv1alpha1.CertManager, scheme *runtime.Scheme, 
 	return nil
 }
 
-func createClusterRole(instance *operatorv1alpha1.CertManager, scheme *runtime.Scheme, client client.Client, ns string) error {
+func createClusterRole(instance *operatorv1alpha1.CertManager, scheme *runtime.Scheme, client client.Client) error {
 	log.Info("Creating cluster role")
 	clusterRole := &rbacv1.ClusterRole{}
 	err := client.Get(context.Background(), types.NamespacedName{Name: res.ClusterRoleName, Namespace: ""}, clusterRole)
@@ -187,7 +187,7 @@ func createClusterRole(instance *operatorv1alpha1.CertManager, scheme *runtime.S
 				Kind:      "ServiceAccount",
 				APIGroup:  "",
 				Name:      res.ServiceAccount,
-				Namespace: ns,
+				Namespace: instance.ObjectMeta.Namespace,
 			},
 		},
 		RoleRef: rbacv1.RoleRef{
@@ -225,10 +225,10 @@ func createClusterRole(instance *operatorv1alpha1.CertManager, scheme *runtime.S
 // 	return nil
 // }
 
-func createServiceAccount(instance *operatorv1alpha1.CertManager, scheme *runtime.Scheme, client client.Client, namespace string) error {
+func createServiceAccount(instance *operatorv1alpha1.CertManager, scheme *runtime.Scheme, client client.Client) error {
 	log.Info("Creating service account")
 	res.DefaultServiceAccount.ResourceVersion = ""
-	res.DefaultServiceAccount.Namespace = namespace
+	res.DefaultServiceAccount.Namespace = instance.ObjectMeta.Namespace
 
 	if err := controllerutil.SetControllerReference(instance, res.DefaultServiceAccount, scheme); err != nil {
 		log.Error(err, "Error setting controller reference on service account")

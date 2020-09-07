@@ -26,7 +26,6 @@ import (
 var DefaultServiceAccount = &corev1.ServiceAccount{
 	ObjectMeta: metav1.ObjectMeta{
 		Name: ServiceAccount,
-		//		Namespace: DeployNamespace,
 	},
 }
 
@@ -138,7 +137,6 @@ var DefaultClusterRoleBinding = &rbacv1.ClusterRoleBinding{
 			Kind:     "ServiceAccount",
 			APIGroup: "",
 			Name:     ServiceAccount,
-			//			Namespace: DeployNamespace,
 		},
 	},
 	RoleRef: rbacv1.RoleRef{
@@ -156,10 +154,9 @@ var WebhookRoleBinding = &rbacv1.RoleBinding{
 	},
 	Subjects: []rbacv1.Subject{
 		{
-			Kind:      "ServiceAccount",
-			APIGroup:  "",
-			Name:      ServiceAccount,
-			Namespace: DeployNamespace,
+			Kind:     "ServiceAccount",
+			APIGroup: "",
+			Name:     ServiceAccount,
 		},
 	},
 	RoleRef: rbacv1.RoleRef{

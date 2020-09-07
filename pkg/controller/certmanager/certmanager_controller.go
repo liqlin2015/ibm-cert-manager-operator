@@ -64,10 +64,6 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	kubeclient, _ := kubernetes.NewForConfig(mgr.GetConfig())
 	ns, _ := k8sutil.GetWatchNamespace()
 
-	if ns == "" {
-		ns = res.DeployNamespace
-	}
-
 	return &ReconcileCertManager{
 		client:       mgr.GetClient(),
 		kubeclient:   kubeclient,
@@ -259,7 +255,6 @@ func (r *ReconcileCertManager) Reconcile(request reconcile.Request) (reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	log.Info("The namespace", "ns", r.ns)
 	r.updateEvent(instance, "Instance found", corev1.EventTypeNormal, "Initializing")
 
 	// Check Prerequisites
@@ -295,30 +290,30 @@ func (r *ReconcileCertManager) PreReqs(instance *operatorv1alpha1.CertManager) e
 }
 
 func (r *ReconcileCertManager) deployments(instance *operatorv1alpha1.CertManager) error {
-	if err := certManagerDeploy(instance, r.client, r.kubeclient, r.scheme, r.ns); err != nil {
+	if err := certManagerDeploy(instance, r.client, r.kubeclient, r.scheme, instance.ObjectMeta.Namespace); err != nil {
 		return err
 	}
 
-	if err := configmapWatcherDeploy(instance, r.client, r.kubeclient, r.scheme, r.ns); err != nil {
+	if err := configmapWatcherDeploy(instance, r.client, r.kubeclient, r.scheme, instance.ObjectMeta.Namespace); err != nil {
 		return err
 	}
 
 	if instance.Spec.Webhook {
 		// Check webhook prerequisites
-		if err := webhookPrereqs(instance, r.scheme, r.client, r.ns); err != nil {
+		if err := webhookPrereqs(instance, r.scheme, r.client, instance.ObjectMeta.Namespace); err != nil {
 			return err
 		}
 		// Deploy webhook and cainjector
-		if err := cainjectorDeploy(instance, r.client, r.kubeclient, r.scheme, r.ns); err != nil {
+		if err := cainjectorDeploy(instance, r.client, r.kubeclient, r.scheme, instance.ObjectMeta.Namespace); err != nil {
 			return err
 		}
-		if err := webhookDeploy(instance, r.client, r.kubeclient, r.scheme, r.ns); err != nil {
+		if err := webhookDeploy(instance, r.client, r.kubeclient, r.scheme, instance.ObjectMeta.Namespace); err != nil {
 			return err
 		}
 	} else {
 		// Specified to not deploy the webhook, remove them if they exist
-		webhook := removeDeploy(r.kubeclient, res.CertManagerWebhookName, res.DeployNamespace)
-		cainjector := removeDeploy(r.kubeclient, res.CertManagerCainjectorName, res.DeployNamespace)
+		webhook := removeDeploy(r.kubeclient, res.CertManagerWebhookName, instance.ObjectMeta.Namespace)
+		cainjector := removeDeploy(r.kubeclient, res.CertManagerCainjectorName, instance.ObjectMeta.Namespace)
 		if !errors.IsNotFound(webhook) {
 			log.Error(webhook, "error removing webhook")
 			return webhook
@@ -328,7 +323,7 @@ func (r *ReconcileCertManager) deployments(instance *operatorv1alpha1.CertManage
 			return cainjector
 		}
 		// Remove webhook prerequisites
-		if err := removeWebhookPrereqs(r.client, r.ns); err != nil {
+		if err := removeWebhookPrereqs(r.client, instance.ObjectMeta.Namespace); err != nil {
 			return err
 		}
 	}
@@ -357,7 +352,7 @@ func (r *ReconcileCertManager) deleteClusterRole(name string) error {
 	}
 
 	if err := r.client.Delete(context.Background(), clusterRole); err != nil {
-		if !apiErrors.IsGone(err) {
+		if !apiErrors.IsNotFound(err) {
 			log.V(1).Info("Error deleting ClusterRole", "name", name, "error message", err)
 			return err
 		}
@@ -371,7 +366,7 @@ func (r *ReconcileCertManager) deleteClusterRole(name string) error {
 	}
 
 	if err := r.client.Delete(context.Background(), clusterRoleBinding); err != nil {
-		if !apiErrors.IsGone(err) {
+		if !apiErrors.IsNotFound(err) {
 			log.V(1).Info("Error deleting ClusterRoleBinding", "name", name, "error message", err)
 			return err
 		}
@@ -388,7 +383,7 @@ func (r *ReconcileCertManager) deleteCRD(name string) error {
 	}
 
 	if err := r.client.Delete(context.Background(), crd); err != nil {
-		if !apiErrors.IsGone(err) {
+		if !apiErrors.IsNotFound(err) {
 			log.V(1).Info("Error deleting CRD", "name", name, "error message", err)
 			return err
 		}
@@ -414,7 +409,7 @@ func (r *ReconcileCertManager) deleteClusterResources(instance *operatorv1alpha1
 	}
 
 	if err := r.client.Delete(context.Background(), apiservice); err != nil {
-		if !apiErrors.IsGone(err) {
+		if !apiErrors.IsNotFound(err) {
 			log.V(1).Info("Error deleting APIService", "name", res.APISvcName, "error message", err)
 			return err
 		}
@@ -428,7 +423,7 @@ func (r *ReconcileCertManager) deleteClusterResources(instance *operatorv1alpha1
 	}
 
 	if err := r.client.Delete(context.Background(), validatingwebhook); err != nil {
-		if !apiErrors.IsGone(err) {
+		if !apiErrors.IsNotFound(err) {
 			log.V(1).Info("Error deleting ValidatingWebhookConfiguration", "name", res.CertManagerWebhookName, "error message", err)
 			return err
 		}
@@ -442,7 +437,7 @@ func (r *ReconcileCertManager) deleteClusterResources(instance *operatorv1alpha1
 	}
 
 	if err := r.client.Delete(context.Background(), mutatingwebhook); err != nil {
-		if !apiErrors.IsGone(err) {
+		if !apiErrors.IsNotFound(err) {
 			log.V(1).Info("Error deleting MutatingWebhookConfiguration", "name", res.CertManagerWebhookName, "error message", err)
 			return err
 		}

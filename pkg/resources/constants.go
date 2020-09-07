@@ -105,8 +105,6 @@ const CainjectorLabels = "app=ibm-cert-manager-cainjector"
 // ConfigmapWatcherLabels is a string of the configmap-watcher's labels
 const ConfigmapWatcherLabels = "app.kubernetes.io/name=configmap-watcher"
 
-// DeployNamespace is the namespace the cert-manager services will be deployed in
-const DeployNamespace = ""
 const pullPolicy = v1.PullIfNotPresent
 
 // CertManagerControllerName is the name of the container/pod/deployment for cert-manager-controller
@@ -219,20 +217,20 @@ var readinessExecActionConfigmapWatcher = v1.ExecAction{
 
 // Cert-manager args
 
-const WatchNS = "--namespace=" + DeployNamespace
+const WatchNS = "--namespace="
 
 // WebhookServingSecret is the name of tls secret used for serving the cert-manager-webhook
 const WebhookServingSecret = "cert-manager-webhook-tls"
 
 // ResourceNS is the resource namespace arg for cert-manager-controller
-const ResourceNS = "--cluster-resource-namespace=" + DeployNamespace
+const ResourceNS = "--cluster-resource-namespace="
 
 const leaderElectNS = "--leader-election-namespace=cert-manager"
 
 // AcmeSolverArg is the acme solver image to use for the cert-manager-controller
 var AcmeSolverArg = "--acme-http01-solver-image=" + acmesolverImage
 
-const webhookNSArg = "--webhook-namespace=" + DeployNamespace
+const webhookNSArg = "--webhook-namespace="
 const webhookCASecretArg = "--webhook-ca-secret=cert-manager-webhook-ca"
 const webhookServingSecretArg = "--webhook-serving-secret=" + WebhookServingSecret
 
@@ -254,7 +252,7 @@ const CRDVersion = "v1alpha1"
 // NamespaceDef is the namespace spec for the cert-manager services and will be where the service is deployed
 var NamespaceDef = &v1.Namespace{
 	ObjectMeta: metav1.ObjectMeta{
-		Name: DeployNamespace,
+		Name: "Place_holder",
 		Labels: map[string]string{
 			"certmanager.k8s.io/disable-validation": "true",
 		},

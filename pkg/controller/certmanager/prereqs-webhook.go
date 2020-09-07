@@ -25,12 +25,18 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	apiRegv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
+
+var valPath = "/apis/webhook.certmanager.k8s.io/v1beta1/validations"
+var mutationPath = "/apis/webhook.certmanager.k8s.io/v1beta1/mutations"
+var failPolicy = admRegv1beta1.Fail
+var sideEffect = admRegv1beta1.SideEffectClassNone
 
 func webhookPrereqs(instance *operatorv1alpha1.CertManager, scheme *runtime.Scheme, client client.Client, ns string) error {
 	// if err := createRoleBinding(instance, scheme, client); err != nil {
@@ -104,7 +110,7 @@ func webhooks(instance *operatorv1alpha1.CertManager, scheme *runtime.Scheme, cl
 	err := client.Get(context.Background(), types.NamespacedName{Name: res.CertManagerWebhookName, Namespace: ""}, mutating)
 	if err != nil && apiErrors.IsNotFound(err) {
 		// Create the mutating webhook spec
-		res.MutatingWebhook.ResourceVersion = ""
+		// res.MutatingWebhook.ResourceVersion = ""
 		// if err := controllerutil.SetControllerReference(instance, res.MutatingWebhook, scheme); err != nil {
 		// 	log.Error(err, "Error setting controller reference on mutating webhook")
 		// }
@@ -118,11 +124,72 @@ func webhooks(instance *operatorv1alpha1.CertManager, scheme *runtime.Scheme, cl
 	err = client.Get(context.Background(), types.NamespacedName{Name: res.CertManagerWebhookName, Namespace: ""}, validating)
 	if err != nil && apiErrors.IsNotFound(err) {
 		// Create the validating webhook spec
-		res.ValidatingWebhook.ResourceVersion = ""
+		// res.ValidatingWebhook.ResourceVersion = ""
 		// if err := controllerutil.SetControllerReference(instance, res.ValidatingWebhook, scheme); err != nil {
 		// 	log.Error(err, "Error setting controller reference on validating webhook")
 		// }
-		err := client.Create(context.Background(), res.ValidatingWebhook)
+
+		validatingWebhook := &admRegv1beta1.ValidatingWebhookConfiguration{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   res.CertManagerWebhookName,
+				Labels: res.WebhookLabelMap,
+				Annotations: map[string]string{
+					"certmanager.k8s.io/inject-apiserver-ca": "true",
+				},
+			},
+			Webhooks: []admRegv1beta1.ValidatingWebhook{
+				{
+					Name: "webhook.certmanager.k8s.io",
+					Rules: []admRegv1beta1.RuleWithOperations{
+						{
+							Operations: []admRegv1beta1.OperationType{
+								admRegv1beta1.Create,
+								admRegv1beta1.Update,
+							},
+							Rule: admRegv1beta1.Rule{
+								APIGroups: []string{
+									"certmanager.k8s.io",
+								},
+								APIVersions: []string{
+									"v1alpha1",
+								},
+								Resources: []string{
+									"certificates",
+									"issuers",
+									"clusterissuers",
+									"certificaterequests",
+								},
+							},
+						},
+					},
+					ClientConfig: admRegv1beta1.WebhookClientConfig{
+						Service: &admRegv1beta1.ServiceReference{
+							Namespace: "default",
+							Name:      "kubernetes",
+							Path:      &valPath,
+						},
+					},
+					FailurePolicy: &failPolicy,
+					SideEffects:   &sideEffect,
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "certmanager.k8s.io/disable-validation",
+								Operator: metav1.LabelSelectorOpNotIn,
+								Values:   []string{"true"},
+							},
+							{
+								Key:      "name",
+								Operator: metav1.LabelSelectorOpNotIn,
+								Values:   []string{instance.ObjectMeta.Namespace},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := client.Create(context.Background(), validatingWebhook)
 		if err != nil {
 			return err
 		}
@@ -198,9 +265,9 @@ func createRoleBinding(instance *operatorv1alpha1.CertManager, scheme *runtime.S
 	err := client.Get(context.Background(), types.NamespacedName{Name: res.CertManagerWebhookName, Namespace: "kube-system"}, roleBinding)
 	if err != nil && apiErrors.IsNotFound(err) {
 		res.WebhookRoleBinding.ResourceVersion = ""
-		// if err := controllerutil.SetControllerReference(instance, res.WebhookRoleBinding, scheme); err != nil {
-		// 	log.Error(err, "Error setting controller reference on rolebinding")
-		// }
+		if err := controllerutil.SetControllerReference(instance, res.WebhookRoleBinding, scheme); err != nil {
+			log.Error(err, "Error setting controller reference on rolebinding")
+		}
 		err := client.Create(context.Background(), res.WebhookRoleBinding)
 		if err != nil {
 			return err

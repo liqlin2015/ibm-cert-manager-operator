@@ -77,8 +77,6 @@ var MutatingWebhook = &admRegv1beta1.MutatingWebhookConfiguration{
 	},
 }
 
-//const injectSecretCA = DeployNamespace + "/" + webhookServingSecret
-
 // APISvcName is the name used for cert-manager-webhooks' apiservice definition
 const APISvcName = "v1beta1.webhook.certmanager.k8s.io"
 
@@ -99,7 +97,6 @@ var APIService = &apiRegv1.APIService{
 		VersionPriority:      15,
 		Service: &apiRegv1.ServiceReference{
 			Name: CertManagerWebhookName,
-			//Namespace: DeployNamespace,
 		},
 		Version: "v1beta1",
 	},
@@ -109,7 +106,6 @@ var APIService = &apiRegv1.APIService{
 var WebhookSvc = &corev1.Service{
 	ObjectMeta: metav1.ObjectMeta{
 		Name: CertManagerWebhookName,
-		//Namespace: DeployNamespace,
 		Labels: map[string]string{
 			"app": "ibm-cert-manager-webhook",
 		},
@@ -132,62 +128,62 @@ var WebhookSvc = &corev1.Service{
 }
 
 // ValidatingWebhook is the validating webhook definition for cert-manager-webhook
-var ValidatingWebhook = &admRegv1beta1.ValidatingWebhookConfiguration{
-	ObjectMeta: metav1.ObjectMeta{
-		Name:   CertManagerWebhookName,
-		Labels: WebhookLabelMap,
-		Annotations: map[string]string{
-			"certmanager.k8s.io/inject-apiserver-ca": "true",
-		},
-	},
-	Webhooks: []admRegv1beta1.ValidatingWebhook{
-		{
-			Name: "webhook.certmanager.k8s.io",
-			Rules: []admRegv1beta1.RuleWithOperations{
-				{
-					Operations: []admRegv1beta1.OperationType{
-						admRegv1beta1.Create,
-						admRegv1beta1.Update,
-					},
-					Rule: admRegv1beta1.Rule{
-						APIGroups: []string{
-							"certmanager.k8s.io",
-						},
-						APIVersions: []string{
-							"v1alpha1",
-						},
-						Resources: []string{
-							"certificates",
-							"issuers",
-							"clusterissuers",
-							"certificaterequests",
-						},
-					},
-				},
-			},
-			ClientConfig: admRegv1beta1.WebhookClientConfig{
-				Service: &admRegv1beta1.ServiceReference{
-					Namespace: "default",
-					Name:      "kubernetes",
-					Path:      &valPath,
-				},
-			},
-			FailurePolicy: &failPolicy,
-			SideEffects:   &sideEffect,
-			NamespaceSelector: &metav1.LabelSelector{
-				MatchExpressions: []metav1.LabelSelectorRequirement{
-					{
-						Key:      "certmanager.k8s.io/disable-validation",
-						Operator: metav1.LabelSelectorOpNotIn,
-						Values:   []string{"true"},
-					},
-					{
-						Key:      "name",
-						Operator: metav1.LabelSelectorOpNotIn,
-						Values:   []string{DeployNamespace},
-					},
-				},
-			},
-		},
-	},
-}
+// var ValidatingWebhook = &admRegv1beta1.ValidatingWebhookConfiguration{
+// 	ObjectMeta: metav1.ObjectMeta{
+// 		Name:   CertManagerWebhookName,
+// 		Labels: WebhookLabelMap,
+// 		Annotations: map[string]string{
+// 			"certmanager.k8s.io/inject-apiserver-ca": "true",
+// 		},
+// 	},
+// 	Webhooks: []admRegv1beta1.ValidatingWebhook{
+// 		{
+// 			Name: "webhook.certmanager.k8s.io",
+// 			Rules: []admRegv1beta1.RuleWithOperations{
+// 				{
+// 					Operations: []admRegv1beta1.OperationType{
+// 						admRegv1beta1.Create,
+// 						admRegv1beta1.Update,
+// 					},
+// 					Rule: admRegv1beta1.Rule{
+// 						APIGroups: []string{
+// 							"certmanager.k8s.io",
+// 						},
+// 						APIVersions: []string{
+// 							"v1alpha1",
+// 						},
+// 						Resources: []string{
+// 							"certificates",
+// 							"issuers",
+// 							"clusterissuers",
+// 							"certificaterequests",
+// 						},
+// 					},
+// 				},
+// 			},
+// 			ClientConfig: admRegv1beta1.WebhookClientConfig{
+// 				Service: &admRegv1beta1.ServiceReference{
+// 					Namespace: "default",
+// 					Name:      "kubernetes",
+// 					Path:      &valPath,
+// 				},
+// 			},
+// 			FailurePolicy: &failPolicy,
+// 			SideEffects:   &sideEffect,
+// 			NamespaceSelector: &metav1.LabelSelector{
+// 				MatchExpressions: []metav1.LabelSelectorRequirement{
+// 					{
+// 						Key:      "certmanager.k8s.io/disable-validation",
+// 						Operator: metav1.LabelSelectorOpNotIn,
+// 						Values:   []string{"true"},
+// 					},
+// 					{
+// 						Key:      "name",
+// 						Operator: metav1.LabelSelectorOpNotIn,
+// 						Values:   []string{DeployNamespace},
+// 					},
+// 				},
+// 			},
+// 		},
+// 	},
+// }
