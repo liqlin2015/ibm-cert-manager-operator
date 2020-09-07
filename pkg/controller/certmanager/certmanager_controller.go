@@ -30,6 +30,8 @@ import (
 	apiextensionsAPIv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
@@ -81,7 +83,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
 	c, err := controller.New("certmanager-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
-		// return err
+		return err
 	}
 
 	// Watch for changes to primary resource CertManager
@@ -240,12 +242,19 @@ func (r *ReconcileCertManager) Reconcile(request reconcile.Request) (reconcile.R
 	} else {
 		// Object scheduled to be deleted
 		if containsString(instance.ObjectMeta.Finalizers, finalizerName) {
+			if err := r.deleteClusterResources(instance); err != nil {
+				// if fail to delete the dependency here, return with error so that it can be retried
+				log.Error(err, "Error deleting cluster resource of cert manager to remove the instance")
+				r.updateStatus(instance, "Error deleting cert-manager.")
+				r.updateEvent(instance, err.Error(), corev1.EventTypeWarning, "DeletingFailed")
+				return reconcile.Result{}, err
+			}
+
 			instance.ObjectMeta.Finalizers = removeString(instance.ObjectMeta.Finalizers, finalizerName)
 			if err := r.client.Update(context.Background(), instance); err != nil {
 				log.Error(err, "Error updating the CR to remove the finalizer")
 				return reconcile.Result{}, err
 			}
-
 		}
 		return reconcile.Result{}, err
 	}
@@ -337,4 +346,114 @@ func (r *ReconcileCertManager) updateStatus(instance *operatorv1alpha1.CertManag
 			log.Error(err, "Error updating instance status")
 		}
 	}
+}
+
+func (r *ReconcileCertManager) deleteClusterRole(name string) error {
+	// Deleting clusterrole
+	clusterRole := &rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+	}
+
+	if err := r.client.Delete(context.Background(), clusterRole); err != nil {
+		if !apiErrors.IsGone(err) {
+			log.V(1).Info("Error deleting ClusterRole", "name", name, "error message", err)
+			return err
+		}
+	}
+
+	// Deleting related cluterrolebinding
+	clusterRoleBinding := &rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+	}
+
+	if err := r.client.Delete(context.Background(), clusterRoleBinding); err != nil {
+		if !apiErrors.IsGone(err) {
+			log.V(1).Info("Error deleting ClusterRoleBinding", "name", name, "error message", err)
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (r *ReconcileCertManager) deleteCRD(name string) error {
+	crd := &apiextensionsAPIv1beta1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+	}
+
+	if err := r.client.Delete(context.Background(), crd); err != nil {
+		if !apiErrors.IsGone(err) {
+			log.V(1).Info("Error deleting CRD", "name", name, "error message", err)
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (r *ReconcileCertManager) deleteClusterResources(instance *operatorv1alpha1.CertManager) error {
+
+	// 1. Deleting the clusterrole and clusterrolebinding
+	// a. Deleting default
+	r.deleteClusterRole(res.ClusterRoleName)
+
+	// b. Deleting clusterrole which is eslicated in ALL namespace mode case.
+	r.deleteClusterRole(res.RoleName)
+
+	// 2. Deleting the apiservice
+	apiservice := &apiRegv1.APIService{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: res.APISvcName,
+		},
+	}
+
+	if err := r.client.Delete(context.Background(), apiservice); err != nil {
+		if !apiErrors.IsGone(err) {
+			log.V(1).Info("Error deleting APIService", "name", res.APISvcName, "error message", err)
+			return err
+		}
+	}
+
+	// 3. Deleting validatingwebhookconfiguration
+	validatingwebhook := &admRegv1beta1.ValidatingWebhookConfiguration{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: res.CertManagerWebhookName,
+		},
+	}
+
+	if err := r.client.Delete(context.Background(), validatingwebhook); err != nil {
+		if !apiErrors.IsGone(err) {
+			log.V(1).Info("Error deleting ValidatingWebhookConfiguration", "name", res.CertManagerWebhookName, "error message", err)
+			return err
+		}
+	}
+
+	// 4. Deleting the mutatingwebhookconfiguration
+	mutatingwebhook := &admRegv1beta1.MutatingWebhookConfiguration{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: res.CertManagerWebhookName,
+		},
+	}
+
+	if err := r.client.Delete(context.Background(), mutatingwebhook); err != nil {
+		if !apiErrors.IsGone(err) {
+			log.V(1).Info("Error deleting MutatingWebhookConfiguration", "name", res.CertManagerWebhookName, "error message", err)
+			return err
+		}
+	}
+
+	// 5. Deleting cert manager CRD (operand)
+	r.deleteCRD("certificates.certmanager.k8s.io")
+	r.deleteCRD("issuers.certmanager.k8s.io")
+	r.deleteCRD("clusterissuers.certmanager.k8s.io")
+	r.deleteCRD("orders.certmanager.k8s.io")
+	r.deleteCRD("challenges.certmanager.k8s.io")
+
+	return nil
 }

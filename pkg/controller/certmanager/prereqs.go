@@ -114,13 +114,13 @@ func createRole(instance *operatorv1alpha1.CertManager, scheme *runtime.Scheme, 
 	role := &rbacv1.Role{}
 	err := client.Get(context.Background(), types.NamespacedName{Name: res.RoleName, Namespace: ns}, role)
 	if err != nil && apiErrors.IsNotFound(err) {
-		// res.DefaultClusterRole.ResourceVersion = ""
+		res.DefaultRole.ResourceVersion = ""
 
 		r := res.DefaultRole.DeepCopy()
 		r.ObjectMeta.Namespace = ns
-		// if err := controllerutil.SetControllerReference(instance, r, scheme); err != nil {
-		// 	log.Error(err, "Error setting controller reference on role")
-		// }
+		if err := controllerutil.SetControllerReference(instance, r, scheme); err != nil {
+			log.Error(err, "Error setting controller reference on role")
+		}
 		err := client.Create(context.Background(), r)
 		if err != nil {
 			return err
@@ -129,7 +129,7 @@ func createRole(instance *operatorv1alpha1.CertManager, scheme *runtime.Scheme, 
 
 	log.Info("Creating rolebinding")
 	// Creating Rolebinding
-	binding := &rbacv1.RoleBinding{
+	b := &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      res.RoleName,
 			Namespace: ns,
@@ -147,7 +147,12 @@ func createRole(instance *operatorv1alpha1.CertManager, scheme *runtime.Scheme, 
 			Name:     res.RoleName,
 		},
 	}
-	err = client.Create(context.Background(), binding)
+	b.ResourceVersion = ""
+
+	if err := controllerutil.SetControllerReference(instance, b, scheme); err != nil {
+		log.Error(err, "Error setting controller reference on role")
+	}
+	err = client.Create(context.Background(), b)
 	if err != nil && !apiErrors.IsAlreadyExists(err) {
 		return err
 	}
@@ -298,38 +303,38 @@ func checkCrds(instance *operatorv1alpha1.CertManager, scheme *runtime.Scheme, c
 }
 
 // Removes the clusterrole and clusterrolebinding created by this operator
-func removeRoles(client client.Client) error {
-	// Delete the clusterrolebinding
-	clusterRoleBinding := &rbacv1.ClusterRoleBinding{}
+// func removeRoles(client client.Client) error {
+// 	// Delete the clusterrolebinding
+// 	clusterRoleBinding := &rbacv1.ClusterRoleBinding{}
 
-	err := client.Get(context.Background(), types.NamespacedName{Name: res.ClusterRoleName, Namespace: ""}, clusterRoleBinding)
-	if err != nil && apiErrors.IsNotFound(err) {
-		log.V(1).Info("Error getting cluster role binding", "msg", err)
-		return nil
-	} else if err == nil {
-		if err = client.Delete(context.Background(), clusterRoleBinding); err != nil {
-			log.V(1).Info("Error deleting cluster role binding", "name", clusterRoleBinding.Name, "error message", err)
-			return err
-		}
-	} else {
-		return err
-	}
-	// Delete the clusterrole
-	clusterRole := &rbacv1.ClusterRole{}
-	err = client.Get(context.Background(), types.NamespacedName{Name: res.ClusterRoleName, Namespace: ""}, clusterRole)
-	if err != nil && apiErrors.IsNotFound(err) {
-		log.V(1).Info("Error getting cluster role", "msg", err)
-		return nil
-	} else if err == nil {
-		if err = client.Delete(context.Background(), clusterRole); err != nil {
-			log.V(1).Info("Error deleting cluster role", "name", clusterRole.Name, "error message", err)
-			return err
-		}
-	} else {
-		return err
-	}
-	return nil
-}
+// 	err := client.Get(context.Background(), types.NamespacedName{Name: res.ClusterRoleName, Namespace: ""}, clusterRoleBinding)
+// 	if err != nil && apiErrors.IsNotFound(err) {
+// 		log.V(1).Info("Error getting cluster role binding", "msg", err)
+// 		return nil
+// 	} else if err == nil {
+// 		if err = client.Delete(context.Background(), clusterRoleBinding); err != nil {
+// 			log.V(1).Info("Error deleting cluster role binding", "name", clusterRoleBinding.Name, "error message", err)
+// 			return err
+// 		}
+// 	} else {
+// 		return err
+// 	}
+// 	// Delete the clusterrole
+// 	clusterRole := &rbacv1.ClusterRole{}
+// 	err = client.Get(context.Background(), types.NamespacedName{Name: res.ClusterRoleName, Namespace: ""}, clusterRole)
+// 	if err != nil && apiErrors.IsNotFound(err) {
+// 		log.V(1).Info("Error getting cluster role", "msg", err)
+// 		return nil
+// 	} else if err == nil {
+// 		if err = client.Delete(context.Background(), clusterRole); err != nil {
+// 			log.V(1).Info("Error deleting cluster role", "name", clusterRole.Name, "error message", err)
+// 			return err
+// 		}
+// 	} else {
+// 		return err
+// 	}
+// 	return nil
+// }
 
 //CheckRhacm checks if RHACM exists
 func checkRhacm(client client.Client) error {
