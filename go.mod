@@ -3,11 +3,14 @@ module github.com/ibm/ibm-cert-manager-operator
 go 1.14
 
 require (
+	github.com/go-delve/delve v1.5.0 // indirect
 	github.com/operator-framework/operator-sdk v0.13.0
 	github.com/pkg/errors v0.8.1
+	github.com/ramya-rao-a/go-outline v0.0.0-20200117021646-2a048b4510eb // indirect
 	github.com/spf13/pflag v1.0.5
-	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550 // indirect
-	golang.org/x/xerrors v0.0.0-20191011141410-1b5146add898 // indirect
+	github.com/stamblerre/gocode v1.0.0 // indirect
+	github.com/uudashr/gopkgs/v2 v2.1.2 // indirect
+	golang.org/x/tools v0.0.0-20200828013309-97019fc2e64b // indirect
 	k8s.io/api v0.0.0
 	k8s.io/apiextensions-apiserver v0.0.0
 	k8s.io/apimachinery v0.0.0

@@ -22,7 +22,6 @@ import (
 
 	operatorv1alpha1 "github.com/ibm/ibm-cert-manager-operator/pkg/apis/operator/v1alpha1"
 	res "github.com/ibm/ibm-cert-manager-operator/pkg/resources"
-
 	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 	admRegv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -82,7 +81,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
 	c, err := controller.New("certmanager-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
-		return err
+		// return err
 	}
 
 	// Watch for changes to primary resource CertManager
@@ -278,11 +277,9 @@ func (r *ReconcileCertManager) Reconcile(request reconcile.Request) (reconcile.R
 
 func (r *ReconcileCertManager) PreReqs(instance *operatorv1alpha1.CertManager) error {
 	if err := checkCrds(instance, r.scheme, r.apiextclient.ApiextensionsV1beta1().CustomResourceDefinitions(), instance.Name, instance.Namespace); err != nil {
-		log.V(2).Info("Checking CRDs failed")
 		return err
 	}
 	if err := checkRbac(instance, r.scheme, r.client, r.ns); err != nil {
-		log.V(2).Info("Checking RBAC failed")
 		return err
 	}
 	return nil

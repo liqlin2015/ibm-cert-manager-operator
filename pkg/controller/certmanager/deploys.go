@@ -25,7 +25,7 @@ import (
 
 	operatorv1alpha1 "github.com/ibm/ibm-cert-manager-operator/pkg/apis/operator/v1alpha1"
 	res "github.com/ibm/ibm-cert-manager-operator/pkg/resources"
-
+	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -53,7 +53,7 @@ func configmapWatcherDeploy(instance *operatorv1alpha1.CertManager, client clien
 }
 
 func deployLogic(instance *operatorv1alpha1.CertManager, client client.Client, kubeclient kubernetes.Interface, scheme *runtime.Scheme, deployTemplate *appsv1.Deployment, name, imageName, labels, ns string) error {
-	similarDeploys := deployFinder(kubeclient, labels, imageName)
+	similarDeploys := deployFinder(kubeclient, labels, imageName, ns)
 	deployment := setupDeploy(instance, deployTemplate, ns)
 	var existingDeploy appsv1.Deployment
 	create := true
@@ -117,16 +117,27 @@ func setupDeploy(instance *operatorv1alpha1.CertManager, deploy *appsv1.Deployme
 		returningDeploy.Spec.Template.Spec.Containers[0].Image = res.GetImageID(imageRegistry, res.ControllerImageName, res.ControllerImageVersion, instance.Spec.ImagePostFix, res.ControllerTagEnvVar)
 		var acmesolver = "--acme-http01-solver-image=" + res.GetImageID(imageRegistry, res.AcmesolverImageName, res.ControllerImageVersion, instance.Spec.ImagePostFix, res.AcmeSolverTagEnvVar)
 
-		var resourceNS = res.ResourceNS
+		var resourceNS string
 		if instance.Spec.ResourceNS != "" {
 			resourceNS = "--cluster-resource-namespace=" + instance.Spec.ResourceNS
+		} else {
+			resourceNS = "--cluster-resource-namespace=" + ns
 		}
+
 		var leaderElect = "--leader-election-namespace=" + ns
 		var webhookNS = "--webhook-namespace=" + ns
 		var webhookDNS = "--webhook-dns-names=cert-manager-webhook,cert-manager-webhook." + ns + ",cert-manager-webhook." + ns + ".svc"
+
+		var watchNS string
+		if namespace, err := k8sutil.GetWatchNamespace(); err != nil {
+			watchNS = "--namespace="
+		} else {
+			watchNS = "--namespace=" + namespace
+		}
+
 		var args = make([]string, len(res.DefaultArgs))
 		copy(args, res.DefaultArgs)
-		args = append(args, acmesolver, resourceNS, leaderElect, webhookNS, webhookDNS)
+		args = append(args, acmesolver, resourceNS, leaderElect, webhookNS, webhookDNS, watchNS)
 		returningDeploy.Spec.Template.Spec.Containers[0].Args = args
 		log.V(3).Info("The args", "args", deploy.Spec.Template.Spec.Containers[0].Args)
 
@@ -139,6 +150,16 @@ func setupDeploy(instance *operatorv1alpha1.CertManager, deploy *appsv1.Deployme
 		}
 
 	case res.CertManagerCainjectorName:
+		var watchNS string
+		if namespace, err := k8sutil.GetWatchNamespace(); err != nil {
+			watchNS = "--namespace="
+		} else {
+			watchNS = "--namespace=" + namespace
+		}
+
+		var args = []string{watchNS}
+		returningDeploy.Spec.Template.Spec.Containers[0].Args = args
+
 		returningDeploy.Spec.Template.Spec.Containers[0].Image = res.GetImageID(imageRegistry, res.CainjectorImageName, res.ControllerImageVersion, instance.Spec.ImagePostFix, res.CaInjectorTagEnvVar)
 		//add resource limits and requests for cainjector only if present in CR else use default as defined in constants.go
 		if instance.Spec.CertManagerCAInjector.Resources.Limits != nil {
@@ -190,12 +211,12 @@ func removeDeploy(client kubernetes.Interface, name, namespace string) error {
 	return nil
 }
 
-func deployFinder(client kubernetes.Interface, labels, name string) []appsv1.Deployment {
+func deployFinder(client kubernetes.Interface, labels, name, ns string) []appsv1.Deployment {
 	log.V(2).Info("Finding preexisting deployments", "deployment name", name)
 	listOpt := metav1.ListOptions{LabelSelector: labels}
 	var allDeploys []appsv1.Deployment
 	var allDeploysMap = make(map[string]appsv1.Deployment)
-	deployList, err := client.AppsV1().Deployments("").List(listOpt)
+	deployList, err := client.AppsV1().Deployments(ns).List(listOpt)
 	// Find deployment by its labels
 	if err != nil {
 		log.Error(err, "Error retrieving deployments by label")
@@ -214,7 +235,7 @@ func deployFinder(client kubernetes.Interface, labels, name string) []appsv1.Dep
 
 	// Find deployment by querying for all and checking the image
 	listOpt = metav1.ListOptions{}
-	deployList, err = client.AppsV1().Deployments("").List(listOpt)
+	deployList, err = client.AppsV1().Deployments(ns).List(listOpt)
 	// Check all the deployments in namespace to see if cert-manager is already installed as a different name
 	if err != nil {
 		log.Error(err, "Error retrieving deployments")

@@ -106,7 +106,7 @@ const CainjectorLabels = "app=ibm-cert-manager-cainjector"
 const ConfigmapWatcherLabels = "app.kubernetes.io/name=configmap-watcher"
 
 // DeployNamespace is the namespace the cert-manager services will be deployed in
-const DeployNamespace = "ibm-common-services"
+const DeployNamespace = ""
 const pullPolicy = v1.PullIfNotPresent
 
 // CertManagerControllerName is the name of the container/pod/deployment for cert-manager-controller
@@ -179,7 +179,9 @@ var configmapWatcherImage = GetImageID(ImageRegistry, ConfigmapWatcherImageName,
 const ServiceAccount = "cert-manager"
 
 // ClusterRoleName is the default name of the clusterrole and clusterrolebinding used by the cert-manager services
-const ClusterRoleName = "cert-manager"
+const ClusterRoleName = "cert-manager-clusterPermission"
+
+const RoleName = "cert-manager-permission"
 
 // SecurityContext values
 var runAsNonRoot = true
@@ -217,11 +219,13 @@ var readinessExecActionConfigmapWatcher = v1.ExecAction{
 
 // Cert-manager args
 
+const WatchNS = "--namespace=" + DeployNamespace
+
 // WebhookServingSecret is the name of tls secret used for serving the cert-manager-webhook
 const WebhookServingSecret = "cert-manager-webhook-tls"
 
 // ResourceNS is the resource namespace arg for cert-manager-controller
-const ResourceNS = "--cluster-resource-namespace=ibm-common-services"
+const ResourceNS = "--cluster-resource-namespace=" + DeployNamespace
 
 const leaderElectNS = "--leader-election-namespace=cert-manager"
 

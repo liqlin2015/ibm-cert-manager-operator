@@ -58,7 +58,7 @@ var controllerContainer = corev1.Container{
 	Name:            CertManagerControllerName,
 	Image:           controllerImage,
 	ImagePullPolicy: pullPolicy,
-	Args:            []string{leaderElectNS, webhookNSArg, webhookCASecretArg, webhookServingSecretArg, webhookDNSNamesArg},
+	Args:            []string{leaderElectNS, webhookNSArg, webhookCASecretArg, webhookServingSecretArg, webhookDNSNamesArg, WatchNS},
 	Env: []corev1.EnvVar{
 		{
 			Name: "POD_NAMESPACE",
@@ -134,6 +134,7 @@ var cainjectorContainer = corev1.Container{
 	Name:            CertManagerCainjectorName,
 	Image:           cainjectorImage,
 	ImagePullPolicy: pullPolicy,
+	Args:            []string{WatchNS},
 	Env: []corev1.EnvVar{
 		{
 			Name: "POD_NAMESPACE",

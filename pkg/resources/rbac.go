@@ -31,9 +31,9 @@ var DefaultServiceAccount = &corev1.ServiceAccount{
 }
 
 // DefaultClusterRole is the cluster role used by cert-manager service
-var DefaultClusterRole = &rbacv1.ClusterRole{
+var DefaultRole = &rbacv1.Role{
 	ObjectMeta: metav1.ObjectMeta{
-		Name: ClusterRoleName,
+		Name: RoleName,
 	},
 	Rules: []rbacv1.PolicyRule{
 		{
@@ -44,7 +44,7 @@ var DefaultClusterRole = &rbacv1.ClusterRole{
 		{
 			Verbs:     []string{"*"},
 			APIGroups: []string{"certmanager.k8s.io"},
-			Resources: []string{"certificates", "issuers", "clusterissuers", "orders", "challenges"},
+			Resources: []string{"certificates", "issuers", "orders", "challenges"},
 		},
 		{
 			Verbs:     []string{"update"},
@@ -53,12 +53,10 @@ var DefaultClusterRole = &rbacv1.ClusterRole{
 				"certificates/status",
 				"certificaterequests/status",
 				"challenges/status",
-				"clusterissuers/status",
 				"issuers/status",
 				"orders/status",
 				"certificates/finalizers",
 				"challenges/finalizers",
-				"ingresses/finalizers",
 				"orders/finalizers",
 			},
 		},
@@ -73,45 +71,59 @@ var DefaultClusterRole = &rbacv1.ClusterRole{
 			Resources: []string{"pods", "services"},
 		},
 		{
-			Verbs:     []string{"get", "list", "watch", "create", "delete", "update"},
-			APIGroups: []string{"extensions"},
-			Resources: []string{"ingresses"},
-		},
-		{
-			Verbs:     []string{"*"},
+			Verbs:     []string{"get", "list", "watch", "update"},
 			APIGroups: []string{"apps"},
 			Resources: []string{"deployments", "statefulsets", "daemonsets"},
 		},
 		{
+			Verbs:     []string{"get", "list", "watch", "update"},
+			APIGroups: []string{"extensions", "networking.k8s.io"},
+			Resources: []string{"ingresses"},
+		},
+	},
+}
+
+// DefaultClusterRole is the cluster role used by cert-manager service
+var DefaultClusterRole = &rbacv1.ClusterRole{
+	ObjectMeta: metav1.ObjectMeta{
+		Name: ClusterRoleName,
+	},
+	Rules: []rbacv1.PolicyRule{
+		{
 			Verbs:     []string{"*"},
+			APIGroups: []string{"certmanager.k8s.io"},
+			Resources: []string{"clusterissuers"},
+		},
+		{
+			Verbs:     []string{"update"},
+			APIGroups: []string{"certmanager.k8s.io"},
+			Resources: []string{"clusterissuers/status"},
+		},
+		{
+			Verbs:     []string{"get", "create", "list", "watch"},
+			APIGroups: []string{"authorization.k8s.io"},
+			Resources: []string{"subjectaccessreviews"},
+		},
+		{
+			Verbs:         []string{"get", "list", "watch"},
+			APIGroups:     []string{""},
+			Resources:     []string{"configmaps"},
+			ResourceNames: []string{"extension-apiserver-authentication"},
+		},
+		{
+			Verbs:     []string{"get", "list", "watch"},
 			APIGroups: []string{"apiextensions.k8s.io"},
 			Resources: []string{"customresourcedefinitions"},
 		},
 		{
-			Verbs:     []string{"*"},
-			APIGroups: []string{"admission.certmanager.k8s.io"},
-			Resources: []string{"certificates", "clusterissuers", "issuers", "certificaterequests"},
-		},
-		{
-			Verbs:         []string{"use"},
-			APIGroups:     []string{"security.openshift.io"},
-			Resources:     []string{"securitycontextconstraints"},
-			ResourceNames: []string{"restricted", "hostnetwork"},
-		},
-		{
-			Verbs:     []string{"*"},
+			Verbs:     []string{"get", "list", "update", "watch"},
 			APIGroups: []string{"admissionregistration.k8s.io"},
 			Resources: []string{"mutatingwebhookconfigurations", "validatingwebhookconfigurations"},
 		},
 		{
-			Verbs:     []string{"*"},
+			Verbs:     []string{"get", "list", "update", "watch"},
 			APIGroups: []string{"apiregistration.k8s.io"},
 			Resources: []string{"apiservices"},
-		},
-		{
-			Verbs:     []string{"*"},
-			APIGroups: []string{"authorization.k8s.io"},
-			Resources: []string{"subjectaccessreviews"},
 		},
 	},
 }

@@ -13,7 +13,7 @@ spec:
     listKind: CertManagerList
     plural: certmanagers
     singular: certmanager
-  scope: Cluster
+  scope: Namespaced
   subresources:
     status: {}
   validation:

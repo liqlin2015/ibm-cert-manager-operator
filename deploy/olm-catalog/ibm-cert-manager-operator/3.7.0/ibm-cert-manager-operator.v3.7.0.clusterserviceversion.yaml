@@ -63,23 +63,6 @@ metadata:
             "commonName": "cs-ca-certificate",
             "isCA": true
           }
-        },
-        {
-          "apiVersion": "certmanager.k8s.io/v1alpha1",
-          "kind": "ClusterIssuer",
-          "metadata": {
-            "labels": {
-              "app.kubernetes.io/instance": "ibm-cert-manager-operator",
-              "app.kubernetes.io/managed-by": "ibm-cert-manager-operator",
-              "app.kubernetes.io/name": "cert-manager"
-            },
-            "name": "cs-ca-clusterissuer"
-          },
-          "spec": {
-            "ca": {
-              "secretName": "cs-ca-certificate-secret"
-            }
-          }
         }
       ]
     capabilities: Basic Install
@@ -182,7 +165,7 @@ spec:
     mediatype: image/png
   install:
     spec:
-      clusterPermissions:
+      permissions:
       - rules:
         - apiGroups:
           - operator.ibm.com
@@ -191,41 +174,17 @@ spec:
           verbs:
           - '*'
         - apiGroups:
-          - ""
+          - operator.ibm.com
           resources:
-          - pods
-          - services
-          - services/finalizers
-          - endpoints
-          - persistentvolumeclaims
-          - events
-          - configmaps
-          - secrets
-          - serviceaccounts
-          - namespaces
+          - certmanagers/status
           verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
           - update
-          - watch
         - apiGroups:
-          - apps
+          - operator.ibm.com
           resources:
-          - deployments
-          - daemonsets
-          - replicasets
-          - statefulsets
+          - certmanagers/finalizers
           verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
           - update
-          - watch
         - apiGroups:
           - monitoring.coreos.com
           resources:
@@ -234,24 +193,14 @@ spec:
           - get
           - create
         - apiGroups:
-          - apps
-          resourceNames:
-          - cert-manager-operator
-          resources:
-          - deployments/finalizers
-          verbs:
-          - update
-        - apiGroups:
-          - apps
-          resources:
-          - replicasets
-          - deployments
-          verbs:
-          - get
-        - apiGroups:
-          - operator.ibm.com
-          resources:
-          - '*'
+          - ""
+          resources:  
+          - pods
+          - services
+          - events
+          - configmaps
+          - secrets
+          - serviceaccounts
           verbs:
           - create
           - delete
@@ -260,63 +209,6 @@ spec:
           - patch
           - update
           - watch
-        - apiGroups:
-          - apiextensions.k8s.io
-          resources:
-          - customresourcedefinitions
-          verbs:
-          - '*'
-        - apiGroups:
-          - rbac.authorization.k8s.io
-          resources:
-          - clusterroles
-          - clusterrolebindings
-          - roles
-          - rolebindings
-          verbs:
-          - create
-          - get
-          - list
-          - watch
-          - patch
-          - update
-          - delete
-        - apiGroups:
-          - apiregistration.k8s.io
-          resources:
-          - apiservices
-          verbs:
-          - create
-          - get
-          - list
-          - watch
-          - patch
-          - update
-          - delete
-        - apiGroups:
-          - admissionregistration.k8s.io
-          resources:
-          - mutatingwebhookconfigurations
-          - validatingwebhookconfigurations
-          verbs:
-          - create
-          - get
-          - list
-          - watch
-          - patch
-          - update
-          - delete
-        - apiGroups:
-          - certmanager.k8s.io
-          resources:
-          - certificates
-          - certificaterequests
-          - orders
-          - challenges
-          - clusterissuers
-          - issuers
-          verbs:
-          - '*'
         - apiGroups:
           - certmanager.k8s.io
           resources:
@@ -325,44 +217,14 @@ spec:
           - challenges/status
           - orders/status
           - issuers/status
-          - clusterissuers/status
           - certificates/finalizers
           - challenges/finalizers
-          - ingresses/finalizers
           - orders/finalizers
           verbs:
           - update
         - apiGroups:
-          - ""
-          resources:
-          - secrets
-          verbs:
-          - get
-          - list
-          - watch
-          - create
-          - update
-          - delete
-        - apiGroups:
-          - ""
-          resources:
-          - events
-          verbs:
-          - create
-          - patch
-        - apiGroups:
-          - ""
-          resources:
-          - pods
-          - services
-          verbs:
-          - get
-          - list
-          - watch
-          - create
-          - delete
-        - apiGroups:
           - extensions
+          - networking.k8s.io
           resources:
           - ingresses
           verbs:
@@ -370,72 +232,130 @@ spec:
           - list
           - watch
           - create
-          - delete
           - update
         - apiGroups:
           - apps
           resources:
           - deployments
           - statefulsets
+          - replicasets
+          - jobs
           - daemonsets
           verbs:
           - '*'
         - apiGroups:
-          - route.openshift.io
+          - certmanager.k8s.io
           resources:
-          - routes/custom-host
+          - certificates
+          - certificaterequests
+          - orders
+          - challenges
+          - issuers
           verbs:
-          - create
+          - '*'
         - apiGroups:
-          - ""
+          - rbac.authorization.k8s.io
           resources:
-          - configmaps
+          - roles
+          - rolebindings
           verbs:
-          - get
           - create
-          - update
-          - patch
+          - delete
+          - get
+          - list
+          - watch
         - apiGroups:
           - admission.certmanager.k8s.io
           resources:
           - certificates
-          - clusterissuers
           - issuers
           - certificaterequests
           verbs:
           - '*'
+        serviceAccountName: ibm-cert-manager-operator
+      clusterPermissions:
+      - rules:
         - apiGroups:
-          - security.openshift.io
-          resourceNames:
-          - restricted
-          - hostnetwork
+          - ""
           resources:
-          - securitycontextconstraints
+          - namespaces
           verbs:
-          - use
+          - get
+        - apiGroups:
+          - certmanager.k8s.io
+          resources:
+          - clusterissuers
+          verbs:
+          - '*'
+        - apiGroups:
+          - certmanager.k8s.io
+          resources:
+          - clusterissuers/status
+          verbs:
+          - update
         - apiGroups:
           - admissionregistration.k8s.io
           resources:
           - mutatingwebhookconfigurations
           - validatingwebhookconfigurations
           verbs:
-          - '*'
+          - get
+          - create
+          - list
+          - update
+          - watch
         - apiGroups:
           - apiregistration.k8s.io
           resources:
           - apiservices
           verbs:
-          - '*'
+          - get
+          - create
+          - list
+          - update
+          - watch
         - apiGroups:
           - authorization.k8s.io
           resources:
           - subjectaccessreviews
           verbs:
-          - '*'
+          - get
+          - create
+          - list
+          - watch
         - apiGroups:
           - operator.open-cluster-management.io
           resources:
           - multiclusterhubs
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - apiextensions.k8s.io
+          resources:
+          - customresourcedefinitions
+          verbs:
+          - get
+          - list
+          - create
+          - watch
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - clusterroles
+          - clusterrolebindings
+          verbs:
+          - create
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - ""
+          resourceNames:
+          - extension-apiserver-authentication
+          resources:
+          - configmaps
           verbs:
           - get
           - list
